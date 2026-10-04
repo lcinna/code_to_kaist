@@ -74,6 +74,21 @@ class Tree {
     }
   }
 
+  // 화면 밖으로 나간 "떨어진 잎" 삭제
+  removeOffscreenLeaves() {
+    for (let i = this.leaves.length - 1; i >= 0; i--) {
+      let leaf = this.leaves[i];
+      if (!leaf.fallen) continue; // 나무에 붙은 잎은 대상 아님
+
+      let p = leaf.body.position;
+      if (p.y > CANVAS_H + 60 || p.x < -60 || p.x > CANVAS_W + 60) {
+        Composite.remove(engine.world, leaf.body); // 물리 세계에서 제거
+        leaf.death = true; // 레지스트리 정리용 표시
+        this.leaves.splice(i, 1); // 이 나무의 배열에서 제거
+      }
+    }
+  }
+
   update() {
     this.removeOffscreenLeaves();
 
@@ -111,21 +126,6 @@ class Tree {
     if (millis() > this.nextDropTime) {
       this.dropLowestLeaf();
       this.nextDropTime = millis() + random(10000, 11000);
-    }
-  }
-
-  // 화면 밖으로 나간 "떨어진 잎" 삭제
-  removeOffscreenLeaves() {
-    for (let i = this.leaves.length - 1; i >= 0; i--) {
-      let leaf = this.leaves[i];
-      if (!leaf.fallen) continue; // 나무에 붙은 잎은 대상 아님
-
-      let p = leaf.body.position;
-      if (p.y > height + 60 || p.x < -60 || p.x > width + 60) {
-        Composite.remove(engine.world, leaf.body); // 물리 세계에서 제거
-        leaf.death = true; // 레지스트리 정리용 표시
-        this.leaves.splice(i, 1); // 이 나무의 배열에서 제거
-      }
     }
   }
 
