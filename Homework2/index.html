@@ -3,11 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <!-- 모바일 필수: 폰에서 PC용 화면처럼 축소되는 것 방지 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"
+    />
     <title>Homework2</title>
     <script src="https://cdn.jsdelivr.net/npm/p5@2/lib/p5.min.js"></script>
     <style>
-      html, body {
+      html,
+      body {
         height: 100%;
         margin: 0;
         overflow: hidden;
@@ -29,8 +33,16 @@
   <body>
     <script>
       // 터치 필수: Safari는 CSS만으로는 드래그 스크롤을 완전히 못 막아서 스크립트로 한 번 더 차단
-      document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener(
+        "touchmove",
+        function (e) {
+          e.preventDefault();
+        },
+        { passive: false },
+      );
     </script>
+    <script src="../addons/matter.js"></script>
     <script src="sketch.js"></script>
+    <script src="tree.js"></script>
   </body>
 </html>
