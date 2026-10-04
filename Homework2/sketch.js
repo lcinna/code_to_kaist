@@ -28,7 +28,7 @@ function setup() {
 
   rectMode(CENTER);
   engine = Engine.create();
-  engine.gravity.scale = 0.0006;
+  engine.gravity.scale = 0.001;
 
   let margin = 20;
   // category 0x0004: 비(mask 0x0001)가 벽을 통과하게 함
