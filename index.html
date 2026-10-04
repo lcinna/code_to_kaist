@@ -65,13 +65,13 @@
 
     <div id="stage">
       <!-- 처음 열었을 때 보여줄 과제 -->
-      <iframe id="viewer" src="Homework1/index.html"></iframe>
+      <iframe id="viewer" src="Homework1/index.html?v=2"></iframe>
     </div>
 
     <script>
       // 메뉴 클릭 시 iframe에 해당 폴더의 index.html을 불러옴
       function loadHomework(folderName) {
-        document.getElementById("viewer").src = folderName + "/index.html";
+        document.getElementById("viewer").src = folderName + "/index.html?v=2";
       }
     </script>
   </body>
