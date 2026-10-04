@@ -4,6 +4,7 @@ const Composite = Matter.Composite;
 const Body = Matter.Body;
 const Query = Matter.Query;
 const Events = Matter.Events;
+let cnv;
 
 let trees = [];
 let leafRegistry = []; // 모든 나무의 잎 정보를 모아두는 전역 배열 (클릭 판별용)
@@ -15,19 +16,9 @@ let rainUntil = 0; // 이 시각까지 비가 내림
 let pendingDrops = []; // 비에 맞아서 떨어질 잎 대기열
 
 function setup() {
-  createCanvas(1700, 600);
-  //
-  let cnv = createCanvas(1700, 600);
-  cnv.style("width", "100%");
-  cnv.style("height", "100%");
-  cnv.style("max-width", "1700px"); // 원본 크기보다 커지지 않게
-  cnv.style("max-height", "600px");
-  cnv.style("width", "auto");
-  cnv.style("height", "auto");
+  cnv = createCanvas(1700, 600); // 내부 해상도는 그대로 (물리 좌표 유지)
   cnv.style("display", "block");
-  cnv.style("transform-origin", "top");
-  cnv.style("transform", "scale(0.8)");
-  //
+  fitCanvas();
   rectMode(CENTER);
   engine = Engine.create();
   engine.gravity.scale = 0.0006;
@@ -66,6 +57,16 @@ function setup() {
   trees.push(new Tree(width / 2 + gap, 1700, 600));
 }
 
+function fitCanvas() {
+  let s = min(1, windowWidth / 1700, windowHeight / 600);
+  cnv.style("width", 1700 * s + "px");
+  cnv.style("height", 600 * s + "px");
+}
+
+function windowResized() {
+  fitCanvas();
+}
+
 function draw() {
   Engine.update(engine);
 
@@ -80,16 +81,12 @@ function draw() {
     tr.display();
   }
 
-  for (let tr of trees) {
-    tr.update();
-    tr.display();
-  }
   leafRegistry = leafRegistry.filter((e) => !e.leaf.death);
 
   updateRain();
   drawRain();
   //
-  print(Composite.allBodies(engine.world).length);
+  //print(Composite.allBodies(engine.world).length);
 }
 
 function mousePressed() {
