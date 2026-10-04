@@ -17,11 +17,11 @@ let pendingDrops = []; // 비에 맞아서 떨어질 잎 대기열
 function setup() {
   createCanvas(1700, 600);
   //
-  let cnv = createCanvas(700, 1200);
+  let cnv = createCanvas(1700, 600);
   cnv.style("width", "100%");
   cnv.style("height", "100%");
-  cnv.style("max-width", "700px"); // 원본 크기보다 커지지 않게
-  cnv.style("max-height", "1200px");
+  cnv.style("max-width", "1700px"); // 원본 크기보다 커지지 않게
+  cnv.style("max-height", "600px");
   cnv.style("width", "auto");
   cnv.style("height", "auto");
   cnv.style("display", "block");
