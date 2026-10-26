@@ -49,7 +49,7 @@ let editStash = null; //수정하는 동안 잠시 치워 두는, 새 메모 작
 
 //보기 화면(3) 아래쪽 줄: 왼쪽부터 제목 상자, 날짜 상자, (오른쪽 끝) edit 버튼
 let viewTitleWRatio = 0.4; //제목 상자 너비 (커진 사각형 너비에 대한 비율)
-let sortMargin = 20; //홈 화면 정렬 버튼(date, random)이 화면 위쪽, 오른쪽에서 떨어진 거리
+let sortMargin = 22; //홈 화면 정렬 버튼(date, random)이 화면 오른쪽에서 떨어진 거리
 let viewGap = 12; //제목 상자와 날짜 상자 사이 간격
 
 //펜
@@ -146,6 +146,69 @@ function getMemoScale(m) {
   );
 }
 
+//예시 메모: samples.json (html, sketch.js와 같은 폴더)에 들어 있고, 방문자가 처음 열었을 때 한 번만 저장 메모에 들어감
+//각 예시는 "ageHours"만큼 시간이 지난 상태로 시작하고, 일반 메모와 똑같이 시간이 지나면서/파도에 깎임
+//m.sampleIdx가 있는 메모가 예시 메모. 100% 다 지워지면 데이터에서 지워지는 대신 처음 상태(ageHours 지난 상태)로 다시 생성됨
+//방문자가 직접 삭제(세 손가락)하면 그대로 지워지고, "memoWebSeeded"에 기록해 두어서 다시 나타나지 않음
+let sampleData = null;
+//p5 버전에 따라 preload가 안 불리기도 해서, preload 대신 fetch로 읽고 다 읽으면 그때 예시 메모를 넣음
+function loadSamples() {
+  fetch("samples.json")
+    .then((r) => r.json())
+    .then((d) => {
+      sampleData = d;
+      seedSamples();
+    })
+    .catch((e) => {
+      sampleData = null; //파일이 없거나 못 읽어도 그냥 넘어감
+      print("samples.json 못 읽음", e);
+    });
+}
+
+//예시 메모 내용(그림, 심볼)을 처음 상태로 새로 복사해서 m에 채움. 시간은 지금부터 ageHours 전으로
+function fillSample(m, idx) {
+  let s = sampleData.memos[idx];
+  let t = Date.now() - (s.ageHours > 0 ? s.ageHours : 0) * 3600 * 1000;
+  m.time = t;
+  m.created = t;
+  m.title = s.title;
+  m.drawing = JSON.parse(JSON.stringify(s.drawing));
+  m.symbol = JSON.parse(JSON.stringify(s.symbol));
+  m.sampleIdx = idx;
+}
+
+function seedSamples() {
+  try {
+    if (getItem("memoWebSeeded") !== null) return;
+    if (sampleData === null || !Array.isArray(sampleData.memos)) return;
+    let used = new Set();
+    for (let m of memos)
+      if (pageOf(m) === 0 && typeof m.cell === "number") used.add(m.cell);
+    for (let k = 0; k < sampleData.memos.length; k++) {
+      let c = sampleData.memos[k].cell;
+      if (used.has(c)) {
+        //원래 칸이 이미 차 있으면 첫 페이지의 빈 칸 중 가장 앞쪽 칸
+        c = -1;
+        for (let i = 0; i < 15; i++) {
+          if (!used.has(i)) {
+            c = i;
+            break;
+          }
+        }
+        if (c === -1) continue; //빈 칸이 없으면 넣지 않음
+      }
+      used.add(c);
+      let m = { cell: c, page: 0 };
+      fillSample(m, k);
+      memos.push(m);
+    }
+    storeItem("memoWeb", memos);
+    storeItem("memoWebSeeded", 1);
+  } catch (e) {
+    print("예시 메모 저장 실패", e);
+  }
+}
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
   //세 손가락으로 쓸 때 브라우저가 화면을 스크롤하거나 확대하지 않게 함
@@ -165,6 +228,7 @@ function setup() {
   if (saved !== null) {
     memos = saved;
   }
+  loadSamples(); //예시 메모 파일 읽기 (처음 온 방문자에게는 다 읽은 뒤 예시 메모가 들어감)
   //페이지 수 불러오기 (메모가 있는 가장 큰 페이지 번호보다는 항상 크거나 같게)
   let pc = getItem("memoWebPages");
   if (typeof pc === "number" && pc >= 1) pageCount = Math.floor(pc);
@@ -781,13 +845,13 @@ function isInside(l, t, r, b) {
 
 //홈 화면 오른쪽 위 정렬 버튼 영역: 맨 오른쪽이 date, 그 왼쪽이 random
 //높이는 memo 버튼과 같고, date는 memo 버튼과 같은 크기, random은 글자가 더 길어서 조금 더 김
-//간격은 done과 next 사이 간격(viewGap)과 같고, 화면 위쪽과 오른쪽에서 sortMargin만큼 떨어짐
+//간격은 done과 next 사이 간격(viewGap)과 같고, 위쪽은 memo 버튼과 같은 높이(startMargin), 오른쪽은 sortMargin만큼 떨어짐
 function getSortAreas() {
   textFont(uiFont);
   textSize(uiTextSize);
   let randomW = Math.max(startW + 20, textWidth("random") + fieldPad * 2);
-  let t = sortMargin;
-  let b = sortMargin + startH;
+  let t = startMargin; //위쪽 위치는 memo 버튼과 똑같이 맞춤
+  let b = startMargin + startH;
   let dateR = width - sortMargin;
   let dateL = dateR - startW;
   let randomR = dateL - viewGap;
@@ -810,7 +874,8 @@ let slideDir = 1; //1: 새 페이지가 오른쪽에서 들어옴, -1: 왼쪽에
 let removeAsk = false; //- 버튼을 한 번 눌러서 remove? 를 보여주는 중인지
 let pageDrag = null; //홈 화면 좌우 드래그 정보 { sx, sy, focusedByPress, active, lx, lt, vx }
 const PAGE_BTN_D = 40; //+ 원 지름
-const PAGE_MARGIN = 20; //+ 원이 화면 아래쪽, 오른쪽에서 떨어진 거리 (페이지 정사각형은 아래쪽만 같음)
+const PAGE_MARGIN = 22; //+ 원이 화면 아래쪽에서 떨어진 거리 (페이지 정사각형도 아래쪽은 같음)
+const PAGE_MARGIN_R = 22; //+ 원이 화면 오른쪽에서 떨어진 거리
 const PAGE_MINUS_GAP = 12; //- 원과 + 원 사이 간격
 const PAGE_SQ = 14; //페이지 정사각형 한 변
 const PAGE_SQ_GAP = 10; //정사각형 사이 간격
@@ -826,7 +891,11 @@ function pageOf(m) {
 //+ 원 버튼과 페이지 정사각형들의 영역
 function getPageAreas() {
   let r = PAGE_BTN_D / 2;
-  let plus = { x: width - PAGE_MARGIN - r, y: height - PAGE_MARGIN - r, r: r };
+  let plus = {
+    x: width - PAGE_MARGIN_R - r,
+    y: height - PAGE_MARGIN - r,
+    r: r,
+  };
   let minus = { x: plus.x, y: plus.y - PAGE_BTN_D - PAGE_MINUS_GAP, r: r };
   let total = pageCount * PAGE_SQ + (pageCount - 1) * PAGE_SQ_GAP;
   let left = width / 2 - total / 2;
@@ -2359,7 +2428,7 @@ function getFadeStep(m) {
   return Math.min(step, getFadeTotalSteps());
 }
 
-//점이 100% 다 사라진 메모는 데이터에서 지움 (칸도 비워짐)
+//점이 100% 다 사라진 메모는 데이터에서 지움 (칸도 비워짐). 단, 예시 메모는 처음 상태로 다시 생성됨
 //보고 있거나 수정 중인 메모가 있으면 번호가 꼬이니까, 홈 화면에서 아무것도 안 열려 있을 때만 지움
 function deleteExpiredMemos() {
   if (
@@ -2377,7 +2446,19 @@ function deleteExpiredMemos() {
     ) {
       if (memos[i].symbol !== undefined) releaseSand(memos[i].symbol);
       if (memos[i].drawing !== undefined) releaseSand(memos[i].drawing);
-      memos.splice(i, 1);
+      let si = memos[i].sampleIdx;
+      if (
+        typeof si === "number" &&
+        sampleData !== null &&
+        Array.isArray(sampleData.memos) &&
+        sampleData.memos[si] !== undefined
+      ) {
+        //예시 메모는 지워지는 대신 처음 상태(ageHours 지난 상태)로 같은 칸에 다시 생성됨
+        healState.delete(memos[i].symbol);
+        fillSample(memos[i], si);
+      } else {
+        memos.splice(i, 1);
+      }
       changed = true;
     }
   }
