@@ -2144,12 +2144,20 @@ function renderSand(sym, sc, slot, step, dotScale, only) {
   let r = sandDotR * ratio;
   let ctx = g.drawingContext;
   ctx.fillStyle = "#000000";
+  //알갱이가 아주 많은 심볼(수십만 개)을 한 번에 칠하면 크롬에서 그림판이 비어 버리거나 멈출 수 있어서,
+  //알갱이 5000개마다 끊어서 칠함 (모양은 똑같음)
   ctx.beginPath();
+  let cnt = 0;
   for (let k = 0; k < dots.length; k += 2) {
     let x = (dots[k] - box.l) * sc;
     let y = (dots[k + 1] - box.t) * sc;
     ctx.moveTo(x + r, y);
     ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (++cnt >= 5000) {
+      ctx.fill();
+      ctx.beginPath();
+      cnt = 0;
+    }
   }
   ctx.fill();
   return g;
