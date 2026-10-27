@@ -3563,7 +3563,11 @@ function drawWashDots() {
 // 수업 코드처럼 p5의 touches 배열(화면에 닿은 손가락 목록)을 매 프레임 확인함. 터치 화면에서만 동작 (마우스는 손가락 1개)
 // 알갱이 수천 개를 가볍게 움직이려고 물리엔진 물체 대신 숫자 배열로 직접 움직임 (알갱이끼리 부딪히지 않으니 결과는 비슷하고 훨씬 가벼움)
 const SWIPE_FINGERS = 3; //쓰는 손가락 수 (이 수 이상이 닿아 있으면 쓸기로 봄)
-const SWIPE_MIN_RATIO = 0.12; //손가락 무리의 중심이 이만큼(화면 짧은 변에 대한 비율) 움직이면 쓴 것으로 인정
+const SWIPE_KEEP_FINGERS = 2; //쓸기를 시작한 뒤에는 이 수 이상이 닿아 있으면 이어감 (필름 때문에 손가락 하나가 끊겨도 계속)
+const SWIPE_GRACE_MS = 300; //손가락이 다 떨어져도 이 시간 안에 다시 닿으면 쓸기를 이어감 (밀리초)
+const SWIPE_MIN_RATIO = 0.08; //손가락 무리의 중심이 이만큼(화면 짧은 변에 대한 비율) 움직이면 쓴 것으로 인정
+const SWIPE_MIN_PX = 50; //위 비율이 너무 작을 때를 위한 최소 이동 거리 (px)
+const SWIPE_DEBUG = false; //true로 바꾸면 왼쪽 아래에 닿은 손가락 수와 쓴 거리를 빨간 글씨로 보여줌 (필름 확인용)
 const SCATTER_SWEEP_MS = 600; //쓴 방향으로 알갱이가 차례로 풀려나는 데 걸리는 시간 (손이 지나가는 느낌)
 const SCATTER_DIST_MIN = 25; //알갱이가 쓴 방향으로 이동하는 거리 범위 (px): 대부분 조금만, 일부만 멀리
 const SCATTER_DIST_MAX = 220;
@@ -3573,7 +3577,7 @@ const SCATTER_LIFE_MIN = 1100; //알갱이가 풀려난 뒤 사라지기까지 �
 const SCATTER_LIFE_MAX = 2600;
 const SCATTER_HOLD = 0.25; //수명의 이 비율까지는 진하게 유지하다가 그 뒤부터 투명해짐
 const SCATTER_LEVELS = 10; //투명도 단계 수 (단계마다 한 번에 그려서 가볍게 함)
-let swipe = null; //쓸고 있는 손가락 정보 { sx, sy: 시작 중심, done: 이미 삭제했는지 }
+let swipe = null; //쓸고 있는 손가락 정보 { ax, ay: 지금까지 중심이 움직인 거리, lx, ly: 마지막 중심, ln: 마지막 손가락 수, lastSeen, done: 이미 삭제했는지 }
 let homeHold = false; //세 손가락으로 메모를 지운 뒤, 알갱이가 다 사라지고 1초가 지날 때까지 홈 화면의 심볼을 숨기고 기다리는 중인지
 let homeHoldAt = 0; //기다림이 끝날 시각 (0이면 알갱이가 아직 흩어지는 중이라 정해지지 않음)
 const HOME_FADE_MS = 1800; //기다림이 끝난 뒤 홈 화면의 심볼들이 서서히 진해지며 나타나는 데 걸리는 시간
@@ -3583,9 +3587,18 @@ const HOME_HOLD_MS = 600; //알갱이가 다 사라진 뒤 홈 화면으로 넘�
 let scatter = null; //흩어지는 알갱이들 { n, r, x0, y0, tx, ty, at, life, ph, wx, wy, tau }
 
 //매 프레임: 손가락 3개가 닿아 있는지 보고, 중심이 충분히 움직였으면 삭제
+//종이질감 필름처럼 터치 감도가 떨어지는 화면에서도 되도록 조금 느슨하게 봄:
+// - 쓸기는 손가락 3개가 닿았을 때 시작하지만, 시작한 뒤에는 손가락이 2개로 줄어도(하나가 끊겨도) 이어감
+// - 손가락이 다 떨어져도 SWIPE_GRACE_MS 안에 다시 닿으면 이어감
+// - 손가락 수가 바뀌는 순간 중심이 튀는 건 움직임으로 치지 않고, 움직인 거리를 쌓아서 셈
 function updateSwipe() {
-  if (touches.length < SWIPE_FINGERS) {
-    swipe = null;
+  let n = touches.length;
+  let active = swipe !== null ? n >= SWIPE_KEEP_FINGERS : n >= SWIPE_FINGERS;
+  if (SWIPE_DEBUG === true) drawSwipeDebug(n);
+  if (active === false) {
+    //잠깐 끊긴 것은 기다려 줌 (기다리는 동안 움직인 것으로 치지 않음)
+    if (swipe !== null && millis() - swipe.lastSeen > SWIPE_GRACE_MS)
+      swipe = null;
     return;
   }
   let cx = 0;
@@ -3594,13 +3607,31 @@ function updateSwipe() {
     cx += t.x;
     cy += t.y;
   }
-  cx /= touches.length;
-  cy /= touches.length;
+  cx /= n;
+  cy /= n;
   if (swipe === null) {
-    swipe = { sx: cx, sy: cy, done: false, prev: {} };
+    swipe = {
+      ax: 0,
+      ay: 0,
+      lx: cx,
+      ly: cy,
+      ln: n,
+      lastSeen: millis(),
+      done: false,
+      prev: {},
+    };
     swipe.prev = bgSnapshot();
     return;
   }
+  //손가락 수가 그대로일 때만 중심이 움직인 만큼 쌓음 (수가 바뀌면 기준점만 다시 잡음)
+  if (n === swipe.ln) {
+    swipe.ax += cx - swipe.lx;
+    swipe.ay += cy - swipe.ly;
+  }
+  swipe.lx = cx;
+  swipe.ly = cy;
+  swipe.ln = n;
+  swipe.lastSeen = millis();
   //홈 화면(아무것도 누르지 않은 상태)에서는 배경 모래를 쓴 방향으로 밀어 줌 (삭제는 아님)
   if (focusIdx === -1 && opened === false && viewClosing === false)
     bgPush(swipe.prev);
@@ -3614,12 +3645,30 @@ function updateSwipe() {
     opened === true
   )
     return;
-  let dx = cx - swipe.sx;
-  let dy = cy - swipe.sy;
+  let dx = swipe.ax;
+  let dy = swipe.ay;
   let len = Math.hypot(dx, dy);
-  if (len < Math.max(70, SWIPE_MIN_RATIO * Math.min(width, height))) return;
+  if (len < Math.max(SWIPE_MIN_PX, SWIPE_MIN_RATIO * Math.min(width, height)))
+    return;
   swipe.done = true; //한 번 쓸 때 한 번만
   deleteFocusedMemo(dx / len, dy / len);
+}
+
+//확인용: 지금 닿아 있는 손가락 수와 쓸기 상태를 왼쪽 아래에 작게 보여줌 (SWIPE_DEBUG가 true일 때만)
+function drawSwipeDebug(n) {
+  push();
+  resetMatrix();
+  noStroke();
+  fill(220, 0, 0);
+  textFont("monospace");
+  textSize(14);
+  textAlign(LEFT, BOTTOM);
+  let st =
+    swipe === null
+      ? "-"
+      : "ax " + Math.round(swipe.ax) + " ay " + Math.round(swipe.ay);
+  text("touches " + n + " | swipe " + st, 12, height - 8);
+  pop();
 }
 
 //지금 손가락 위치를 기억 (다음 프레임에 얼마나 움직였는지 알기 위해)
